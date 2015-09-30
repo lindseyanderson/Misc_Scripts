@@ -15,13 +15,14 @@ apache_http22_template = """<VirtualHost {bind_address}:{http_port}>
 		Order deny,allow
 		Allow from all
         </Directory>
-        CustomLog {log_directory}/{server_name}.access.log combined
-        ErrorLog {log_directory}/{server_name}-error.log
+        CustomLog {log_string}.access.log combined
+        ErrorLog {log_string}-error.log
         # Possible values include: debug, info, notice, warn, error, crit,
         # alert, emerg.
         LogLevel warn
         {ssl_options}
-</VirtualHost>"""
+</VirtualHost>
+"""
 
 apache_http22_ssl_options = """
         SSLEngine on
@@ -29,43 +30,51 @@ apache_http22_ssl_options = """
         SSLCertificateKeyFile {ssl_certificate_key_file}
         {ssl_certificate_ca_file}
 
-        <FilesMatch \"\.(cgi|shtml|phtml|php)$\">
+        <FilesMatch \\"\.(cgi|shtml|phtml|php)$\\">
                 SSLOptions +StdEnvVars
         </FilesMatch>
 
-        BrowserMatch \"MSIE [2-6]\" \
-                nokeepalive ssl-unclean-shutdown \
+        BrowserMatch \\"MSIE [2-6]\\" \\
+                nokeepalive ssl-unclean-shutdown \\
                 downgrade-1.0 force-response-1.0
-        BrowserMatch \"MSIE [17-9]\" ssl-unclean-shutdown
+        BrowserMatch \\"MSIE [17-9]\\" ssl-unclean-shutdown
 """
 
-
-def distro_log_dir():
-    distro_log_dir = "/var/log"
+def get_log_string(args):
+    log_string = '/var/log/{0}/ssl-{1}' if args.get('enable_ssl') \
+                 else '/var/log/{0}/{1}'
     if (platform.linux_distribution()[0].lower() == "centos") or \
        (platform.linux_distribution()[0].lower() == "redhat"):
-        distro_log_dir = "/var/log/httpd"
-    elif (platform.linux_distribution()[0].lower() == "debian") or \
-         (platform.linux_distribution()[0].lower() == "ubuntu"):
-        distro_log_dir = "/var/log/apache2"
-    return distro_log_dir
+        log_string = log_string.format('httpd', args.get('server_name'))
+    elif (platform.linux_distribution()[0].lower() == "ubuntu") or \
+         (platform.linux_distribution()[0].lower() == "debian"):
+        log_string = log_string.format('apache2', args.get('server_name'))
+    else:
+        log_string = log_string.format('apache2', args.get('server_name'))
+    return log_string
 
 def create_template(args):
     template = ''
-    args['ssl_options'] = ''
-    args['log_directory'] = distro_log_dir() if not \
-         args.get('log_directory') else args.get('log_directory')
-    args['document_root'] = '/var/www/vhosts/{0}'.format(
+    args['document_root'] = '/var/www/vhosts/{0}/httpdocs'.format(
          args.get('server_name')) if not args.get('document_root') else \
          args.get('document_root')
-    args['alt_names'] = ' '.join(map(str, args.get('alt_names')))
-    if args.get('ssl_enabled'):
-        args['ssl_enabled'] = False
+    log_string = get_log_string(args)
+    if args.get('enable_ssl'):
+        args['enable_ssl'] = False
         template = create_template(args)
-        args['ssl_options'] = apache_http_template.format(**args)
+        args['enable_ssl'] = True
+        args['ssl_certificate_ca_file'] = 'SSLCACertificateFile  {0}'.format(
+             args.get('ssl_certificate_ca_file')) if \
+             args.get('ssl_certificate_ca_file') else ''
+        args['http_port'] = args.get('https_port')
+        args['ssl_options'] = apache_http22_ssl_options.format(**args)
 
+    args['log_string'] = log_string if not \
+        args.get('log_string') else args.get('log_string')
     template = template + apache_http22_template.format(**args) 
+    args['log_string'] = None
     return template
+
 
 if __name__ == '__main__':
 
@@ -85,15 +94,29 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--http-port', 
                         help="HTTP port for the virtual host to listen on.",
                         default=80)
+    parser.add_argument('--https-port', default=443,
+                        help="HTTPS port for the virtual host to listen on.")
+    parser.add_argument('--ssl-certificate-file',
+                        help="Location to the SSL Certificate file.")
+    parser.add_argument('--ssl-certificate-key-file',
+                        help="Location to the SSL Certificate Key file.")
+    parser.add_argument('--ssl-certificate-ca-file',
+                        help="Location to the SSL Certificate CA file.")
     parser.add_argument('-r', '--reload-service', action='store_true',
                         help="Reload the service after installation.",
                         default=False)
     parser.add_argument('-z', '--no-install', action='store_true',
                         help="Only display virtual host data, do not install.",
                         default=False)
+    parser.add_argument('--enable-ssl', action='store_true',
+                        help="Enable SSL virtual host.", default=False)
 
     args = vars(parser.parse_args())
-    os_distribution = platform.linux_distribution()[0].lower()
-    os_release = platform.linux_distribution()[1].lower()
+    if args.get('enable_ssl') and args.get('ssl_certificate_file') is None \
+       and args.get('ssl_certificate_key_file') is None:
+        parser.error('--enable-ssl requires --ssl-certificate-file and '
+                     '--ssl-certificate-key-file.')
+    args['alt_names'] = ' '.join(map(str, args.get('alt_names')))
+    args['ssl_options'] = ''
 
     print create_template(args) if args.get('no_install') else install_vhost(args)
