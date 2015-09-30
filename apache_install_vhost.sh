@@ -16,7 +16,6 @@ SCRIPT_NAME="$(basename ${0})"
 #   -p [80],--http-port  			Set HTTP port
 #						- Default to 80
 #
-#   -r,--reload					Reload the Apache service
 #   --enable-ssl-vhost				Option to enable SSL portion
 #   --ssl-port [443]				Set HTTPS port (only used with
 #						enable-ssl-vhost)
@@ -37,6 +36,9 @@ SCRIPT_NAME="$(basename ${0})"
 #						location when enable-ssl-vhost
 #						is enabled
 #
+#   -z,--no-install				Only print vhost output, do
+#						not install.
+#   -r,--reload					Reload the Apache service
 #   -h, --help					Print help options
 #   -v, --version				Print script version
 #
@@ -48,17 +50,14 @@ SCRIPT_NAME="$(basename ${0})"
 ############################################################################### 
 
 
+
 #####
 # Determine the current distribution and release of the server
 function set_distro {
-if [ -f /etc/lsb-release ]; then 
-  . /etc/lsb-release
-  OS=${DISTRIB_ID}
-  RELEASE=${DISTRIB_RELEASE}
-else
-  OS=$(python -c "import platform; print(platform.linux_distribution()[0])")
-  RELEASE=$(python -c "import platform; print(platform.linux_distribution()[1])")
-fi
+OS=$(python -c "import platform; print(platform.linux_distribution()[0])" | 
+     awk '{print tolower($0)}')
+RELEASE=$(python -c "import platform; print(platform
+                     .linux_distribution()[1])" | awk '{print tolower($0)}')
 }
 
 #####
@@ -90,13 +89,21 @@ if [[ "$EUID" -ne 0 ]]; then
   exit 1
 fi
 
-set_distro
-echo "${OS}"
-echo "${RELEASE}"
 #####
 # Parse arguments and options being passed to the script
-while getopts ":v:h" opt; do
+while getopts ":s:n:d:z:r:v:h" opt; do
   case "${opt}" in
+    s) echo "-s was triggered, Parameter: $OPTARG"
+       SERVER_NAME="${OPTARG}"
+       ;;
+    n) SERVER_ALIASES="${OPTARG}"
+       ;;
+    d) DOCUMENT_ROOT="${OPTARG}"
+       ;;
+    z) NO_INSTALL=true
+       ;;
+    r) RELOAD_SERVICE=true
+       ;;
     v) version
        exit 0
        ;;
@@ -113,3 +120,48 @@ while getopts ":v:h" opt; do
        ;;
   esac
 done
+
+#####
+# Test to ensure the server name was passed to the script
+#if ! "${SERVER_NAME}"; then
+#  echo "Server name is a required field.  Please re-run the script with
+#        the appropriate flags set."
+#  usage
+#  exit 1
+#fi
+
+#####
+# Test to ensure certificates are passed if ssl-enable-vhost is selected
+if [ "${SSL_ENABLED_VHOST}" = true ]; then
+  if [ ! -f "${SSL_CERTIFICATE_FILE}" ] || 
+     [ ! -f "${SSL_CERTIFICATE_KEY_FILE}" ]; then
+    echo "Please provide a proper SSL Certificate File and SSL Certificate Key
+          when enabling the SSL virtual host.  These files must exist in the
+          location provided."
+    usage
+    exit 1
+  fi
+fi
+
+set_distro
+VHOST_DATA="vhost-data-test"
+NO_INSTALL=true
+if [[ "${OS}" == "centos" ]] || [[ "${OS}" == "redhat" ]]; then
+  if [ "${NO_INSTALL}" = true ]; then
+    echo "${SERVER_NAME}"
+    echo "${VHOST_DATA}"
+    exit 0
+  fi
+
+  if [ ! -d /etc/httpd/vhost.d ]; then
+    mkdir -p /etc/httpd/vhost.d &&
+    echo "include vhost.d/*.conf" >> /etc/httpd/conf/httpd.conf
+  fi
+  echo "${VHOST_DATA}" > /etc/httpd/vhost.d/${SERVER_NAME}.conf
+  mkdir -p ${DOCUMENT_ROOT}
+  if [ "${RELOAD_SERVICE}" = true ]; then
+    apachectl -k graceful &
+  fi
+elif [[ "${OS}" == "ubuntu" ]] || [[ "${OS}" == "debian" ]]; then
+  echo "Debian stuff"
+fi
