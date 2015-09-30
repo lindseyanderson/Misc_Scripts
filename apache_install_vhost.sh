@@ -47,6 +47,20 @@ SCRIPT_NAME="$(basename ${0})"
 # HEADER END
 ############################################################################### 
 
+
+#####
+# Determine the current distribution and release of the server
+function set_distro {
+if [ -f /etc/lsb-release ]; then 
+  . /etc/lsb-release
+  OS=${DISTRIB_ID}
+  RELEASE=${DISTRIB_RELEASE}
+else
+  OS=$(python -c "import platform; print(platform.linux_distribution()[0])")
+  RELEASE=$(python -c "import platform; print(platform.linux_distribution()[1])")
+fi
+}
+
 #####
 # Print help information
 function usage {
@@ -76,6 +90,9 @@ if [[ "$EUID" -ne 0 ]]; then
   exit 1
 fi
 
+set_distro
+echo "${OS}"
+echo "${RELEASE}"
 #####
 # Parse arguments and options being passed to the script
 while getopts ":v:h" opt; do
