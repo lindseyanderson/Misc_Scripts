@@ -5,6 +5,7 @@ import os
 import platform
 import re
 import subprocess
+import sys
 
 
 apache_http22_template = """<VirtualHost {bind_address}:{http_port}>
@@ -78,23 +79,33 @@ def create_template(args):
 def install_vhost(args):
     template = create_template(args)
     
+    if not os.path.exists(args.get('document_root')):
+        os.makedirs(args.get('document_root'))
+
     if (platform.linux_distribution()[0].lower() == "centos") or \
        (platform.linux_distribution()[0].lower() == "redhat"):
-       p = subprocess.Popen("httpd -V", shell=True, stdout=subprocess.PIPE)
-       for line in p.stdout.readlines():
-           if "HTTPD_ROOT" in line:
-               apache_base = line.split('=')[1].replace('"', '')
-       apache_base = re.sub('[^a-zA-Z0-9-_/.]', '', apache_base)
-       if not os.path.exists(apache_base + '/vhosts'):
-           os.makedirs(apache_base + '/vhosts')
-       file_location = "{0}/vhosts/{1}.conf".format(apache_base, 
-                                             args.get('server_name'))
-       f = open(file_location, 'w')
-       f.write(template)
-       f.close()
-
-    if not os.path.exists(args.get('document_root')):
-       os.makedirs(args.get('document_root'))
+        p = subprocess.Popen("httpd -V", shell=True, stdout=subprocess.PIPE)
+        for line in p.stdout.readlines():
+            if "HTTPD_ROOT" in line:
+                apache_base = line.split('=')[1].replace('"', '')
+        apache_base = re.sub('[^a-zA-Z0-9-_/.]', '', apache_base)
+        if not os.path.exists(apache_base + '/vhost.d'):
+            os.makedirs(apache_base + '/vhost.d')
+            with open(apache_base + '/conf/httpd.conf') as conf_file:
+                conf_file.write('include vhost.d/*.conf')
+        file_location = "{0}/vhost.d/{1}.conf".format(apache_base, 
+                                              args.get('server_name'))
+        f = open(file_location, 'w')
+        f.write(template)
+        f.close()
+        if args.get('reload_service'):
+           p = subprocess.Popen(["apachectl", "-k", "graceful"], shell=True,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+           p.wait()
+           print p.returncode
+        sys.exit(0)
+        
 
 if __name__ == '__main__':
 
@@ -132,6 +143,7 @@ if __name__ == '__main__':
                         help="Enable SSL virtual host.", default=False)
 
     args = vars(parser.parse_args())
+    print args
     if args.get('enable_ssl') and args.get('ssl_certificate_file') is None \
        and args.get('ssl_certificate_key_file') is None:
         parser.error('--enable-ssl requires --ssl-certificate-file and '
@@ -139,7 +151,9 @@ if __name__ == '__main__':
     args['document_root'] = '/var/www/vhosts/{0}/httpdocs'.format(
          args.get('server_name')) if not args.get('document_root') else \
          args.get('document_root')
-    args['alt_names'] = ' '.join(map(str, args.get('alt_names')))
+    args['alt_names'] = ' '.join(map(str, args.get('alt_names'))) if \
+                        args.get('alt_names') else 'www.{0}'.format(
+                        args.get('server_name'))
     args['ssl_options'] = ''
 
     if args.get('no_install'):
