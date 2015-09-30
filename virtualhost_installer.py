@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 
 import argparse
+import os
 import platform
+import re
+import subprocess
 
 
 apache_http22_template = """<VirtualHost {bind_address}:{http_port}>
@@ -55,9 +58,6 @@ def get_log_string(args):
 
 def create_template(args):
     template = ''
-    args['document_root'] = '/var/www/vhosts/{0}/httpdocs'.format(
-         args.get('server_name')) if not args.get('document_root') else \
-         args.get('document_root')
     log_string = get_log_string(args)
     if args.get('enable_ssl'):
         args['enable_ssl'] = False
@@ -75,6 +75,26 @@ def create_template(args):
     args['log_string'] = None
     return template
 
+def install_vhost(args):
+    template = create_template(args)
+    
+    if (platform.linux_distribution()[0].lower() == "centos") or \
+       (platform.linux_distribution()[0].lower() == "redhat"):
+       p = subprocess.Popen("httpd -V", shell=True, stdout=subprocess.PIPE)
+       for line in p.stdout.readlines():
+           if "HTTPD_ROOT" in line:
+               apache_base = line.split('=')[1].replace('"', '')
+       apache_base = re.sub('[^a-zA-Z0-9-_/.]', '', apache_base)
+       if not os.path.exists(apache_base + '/vhosts'):
+           os.makedirs(apache_base + '/vhosts')
+       file_location = "{0}/vhosts/{1}.conf".format(apache_base, 
+                                             args.get('server_name'))
+       f = open(file_location, 'w')
+       f.write(template)
+       f.close()
+
+    if not os.path.exists(args.get('document_root')):
+       os.makedirs(args.get('document_root'))
 
 if __name__ == '__main__':
 
@@ -116,7 +136,13 @@ if __name__ == '__main__':
        and args.get('ssl_certificate_key_file') is None:
         parser.error('--enable-ssl requires --ssl-certificate-file and '
                      '--ssl-certificate-key-file.')
+    args['document_root'] = '/var/www/vhosts/{0}/httpdocs'.format(
+         args.get('server_name')) if not args.get('document_root') else \
+         args.get('document_root')
     args['alt_names'] = ' '.join(map(str, args.get('alt_names')))
     args['ssl_options'] = ''
 
-    print create_template(args) if args.get('no_install') else install_vhost(args)
+    if args.get('no_install'):
+        create_template(args)
+    else:
+        install_vhost(args)
