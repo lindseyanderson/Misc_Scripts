@@ -102,8 +102,6 @@ def install_vhost(args):
            p = subprocess.Popen(["apachectl", "-k", "graceful"], shell=True,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
-           p.wait()
-           print p.returncode
         sys.exit(0)
         
 
@@ -143,7 +141,6 @@ if __name__ == '__main__':
                         help="Enable SSL virtual host.", default=False)
 
     args = vars(parser.parse_args())
-    print args
     if args.get('enable_ssl') and args.get('ssl_certificate_file') is None \
        and args.get('ssl_certificate_key_file') is None:
         parser.error('--enable-ssl requires --ssl-certificate-file and '
