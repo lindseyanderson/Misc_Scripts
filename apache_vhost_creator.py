@@ -70,9 +70,16 @@ class Server:
     def get_distro_release(self):
         return self._version
    
-     
-my_server = Server()
-print my_server.os_family
-print my_server.apache_config_dir
-print my_server.apache_vhost_config_dir
-print my_server.apache_release_version
+    def print_about(self):
+        print "OS Family: {0}".format(self.os_family)
+        print "OS Distribution: {0}".format(self.distribution)
+        print "OS Release Version: {0}".format(self.version)
+        print "Apache Version: {0}".format(self.apache_release_version)
+        print "Apache Configuration Base: {0}".format(self.apache_config_dir)
+        print "Apache Vhost Configuration Directory: {0}".format(
+              self.apache_vhost_config_dir)
+   
+
+if __name__ == '__main__':
+    my_server = Server()
+    my_server.print_about()
