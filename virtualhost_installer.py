@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 
-apache_http22_template = """<VirtualHost {bind_address}:{http_port}>
+apache_http_template = """<VirtualHost {bind_address}:{http_port}>
         ServerName {server_name} 
         ServerAlias {alt_names}
         DocumentRoot {document_root}
@@ -16,8 +16,7 @@ apache_http22_template = """<VirtualHost {bind_address}:{http_port}>
         <Directory {document_root}>
                 Options -Indexes +FollowSymLinks -MultiViews
                 AllowOverride All
-		Order deny,allow
-		Allow from all
+                {mod_auth_options}
         </Directory>
         CustomLog {log_string}.access.log combined
         ErrorLog {log_string}-error.log
@@ -27,8 +26,7 @@ apache_http22_template = """<VirtualHost {bind_address}:{http_port}>
         {ssl_options}
 </VirtualHost>
 """
-
-apache_http22_ssl_options = """
+apache_http_ssl_options = """
         SSLEngine on
         SSLCertificateFile    {ssl_certificate_file} 
         SSLCertificateKeyFile {ssl_certificate_key_file}
@@ -43,6 +41,23 @@ apache_http22_ssl_options = """
                 downgrade-1.0 force-response-1.0
         BrowserMatch \\"MSIE [17-9]\\" ssl-unclean-shutdown
 """
+
+def get_auth_options():
+    if (platform.linux_distribution()[0].lower() == "centos") or \
+       (platform.linux_distribution()[0].lower() == "redhat"):
+        mod_auth_options = """Order Allow,Deny
+                Allow from all"""   
+        if (platform.linux_distribution()[1].startswith("7")):
+            mod_auth_options = """Require all granted
+            """
+ 
+    elif (platform.linux_distribution()[0].lower() == "debian") or \
+         (platform.linux_distribution()[0].lower() == "ubuntu"):
+        mod_auth_options = """Order Allow,Deny
+                Allow from all"""   
+        if (platform.linux_distribution()[1].startswith("14")):
+            mod_auth_options = """Require all granted"""
+    return mod_auth_options
 
 def get_log_string(args):
     log_string = '/var/log/{0}/ssl-{1}' if args.get('enable_ssl') \
@@ -60,6 +75,7 @@ def get_log_string(args):
 def create_template(args):
     template = ''
     log_string = get_log_string(args)
+    args['mod_auth_options'] = get_auth_options()
     if args.get('enable_ssl'):
         args['enable_ssl'] = False
         template = create_template(args)
@@ -68,11 +84,11 @@ def create_template(args):
              args.get('ssl_certificate_ca_file')) if \
              args.get('ssl_certificate_ca_file') else ''
         args['http_port'] = args.get('https_port')
-        args['ssl_options'] = apache_http22_ssl_options.format(**args)
+        args['ssl_options'] = apache_http_ssl_options.format(**args)
 
     args['log_string'] = log_string if not \
         args.get('log_string') else args.get('log_string')
-    template = template + apache_http22_template.format(**args) 
+    template = template + apache_http_template.format(**args) 
     args['log_string'] = None
     return template
 
@@ -94,7 +110,7 @@ def install_vhost(args):
             with open(apache_base + '/conf/httpd.conf') as conf_file:
                 conf_file.write('include vhost.d/*.conf')
         file_location = "{0}/vhost.d/{1}.conf".format(apache_base, 
-                                              args.get('server_name'))
+                                               args.get('server_name'))
         f = open(file_location, 'w')
         f.write(template)
         f.close()
@@ -102,6 +118,26 @@ def install_vhost(args):
            p = subprocess.Popen(["apachectl", "-k", "graceful"], shell=True,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
+        sys.exit(0)
+    if (platform.linux_distribution()[0].lower() == "ubuntu") or \
+       (platform.linux_distribution()[0].lower() == "debian"):
+        p = subprocess.Popen(["apache2ctl", "-V"], shell=True, 
+                             stdout=subprocess.PIPE)
+        for line in p.stdout.readlines():
+            if "HTTPD_ROOT" in line:
+                apache_base = line.split('=')[1].replace('"', '')
+        apache_base = re.sub('[^a-zA-Z0-9-_/.]', '', apache_base)
+        file_location = "{0}/sites-available/{1}".format(apache_base,
+                                                  args.get('server_name'))
+        f = open(file_location, 'w')
+        f.write(template)
+        f.close()
+        if args.get('reload_service'):
+            p = subprocess.Popen(["a2ensite", args.get('server_name')],
+                                 shell=True)
+            pr = subprocess.Popen(["apache2ct", "-k", "graceful"], shell=True,
+                                  stdout=subprocess.PIPE,
+                                  stderr=subprocess.PIPE)
         sys.exit(0)
         
 
@@ -154,6 +190,6 @@ if __name__ == '__main__':
     args['ssl_options'] = ''
 
     if args.get('no_install'):
-        create_template(args)
+        print create_template(args)
     else:
         install_vhost(args)
