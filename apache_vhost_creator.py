@@ -80,14 +80,37 @@ class Server:
               self.apache_vhost_config_dir)
    
 
-class VirtualHost:
+class VirtualHost():
     """
     """
-    def __init__(self, args):
+    def __init__(self, args, server):
         self._args = args
+        self.server = server
         self.server_name = self.get_server_name()
         self.server_aliases = self.get_server_aliases() 
         self.document_root = self.get_document_root()
+        self.bind_address = self.get_bind_address()
+        self.log_directory = self.get_log_directory()
+        self.http_port = self.get_http_port()
+        self.reload_server = self.get_reload_server()
+        self.no_install = self.get_no_install()
+        self.enable_ssl = self.get_enable_ssl()
+        if self.enable_ssl:
+            self.ssl_certificate_file = self.get_ssl_certificate_file()
+            self.ssl_certificate_key_file = self.get_ssl_certificate_key_file()
+            self.ssl_certificate_ca_file = self.get_ssl_certificate_ca_file()
+ 
+
+    def print_about(self):
+        print "Server Name: {0}".format(virtualhost.server_name)
+        print "Server Aliases: {0}".format(virtualhost.server_aliases)
+        print "Document Root: {0}".format(virtualhost.document_root)
+        print "Bind address: {0}".format(virtualhost.bind_address)
+        print "Log Directory: {0}".format(virtualhost.log_directory)
+        print "HTTP Port: {0}".format(virtualhost.http_port)
+        print "Reload Apache? {0}".format(virtualhost.reload_server)
+        print "Install virtual host? {0}".format(virtualhost.no_install)
+        print "SSL Enabled? {0}".format(virtualhost.enable_ssl)
 
     def get_server_name(self):
         self.server_name = self._args.get('server_name')
@@ -99,6 +122,7 @@ class VirtualHost:
                               if server_aliases else \
                               'www.{0}'.format(self.server_name)
         return self.server_aliases
+
     def get_document_root(self):
         document_root = self._args.get('document_root')
         self.document_root = '/var/www/vhosts/{0}/httpdocs'.format( 
@@ -106,8 +130,38 @@ class VirtualHost:
                              document_root
         return self.document_root
 
+    def get_bind_address(self):
+        self.bind_address = self._args.get('bind_address')
+        return self.bind_address
+
+    def get_log_directory(self):
+        self.log_directory = self._args.get('log_directory') if \
+                             self._args.get('log_directory') is not None else \
+                             '/var/log/httpd/' \
+                             if self.server.os_family == 'redhat' else \
+                             '/var/log/apache2/'
+        
+        return self.log_directory
+
+    def get_http_port(self):
+        self.http_port = self._args.get('http_port')
+        return self.http_port
+
+
+    def get_reload_server(self):
+        self.reload_server = self._args.get('reload_service')
+        return self.reload_server
+   
+    def get_no_install(self):
+        self.no_install = self._args.get('no_install')
+        return self.no_install
+
+    def get_enable_ssl(self):
+        self.enable_ssl = self._args.get('enable_ssl')
+        return self.enable_ssl
 
 if __name__ == '__main__':
+
     description = "Virtual Host installation for Apache running on Linux."
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('-s', '--server-name',
@@ -142,11 +196,10 @@ if __name__ == '__main__':
                         help="Enable SSL virtual host.", default=False)
 
     args = vars(parser.parse_args())
+    if args.get('enable_ssl') and args.get('ssl_certificate_file') is None \
+       and args.get('ssl_certificate_key_file') is None:
+        parser.error('--enable-ssl requires --ssl-certificate-file and '
+                     '--ssl-certificate-key-file.')
 
-    my_server = Server()
-    virtualhost = VirtualHost(args)
-    my_server.print_about()
-    print virtualhost.server_name
-    print virtualhost.server_aliases
-    print virtualhost.document_root
-
+    virtualhost = VirtualHost(args, Server())
+    virtualhost.print_about()
