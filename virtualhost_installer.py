@@ -159,6 +159,12 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--http-port', 
                         help="HTTP port for the virtual host to listen on.",
                         default=80)
+    parser.add_argument('-r', '--reload-service', action='store_true',
+                        help="Reload the service after installation.",
+                        default=False)
+    parser.add_argument('-z', '--no-install', action='store_true',
+                        help="Only display virtual host data, do not install.",
+                        default=False)
     parser.add_argument('--https-port', default=443,
                         help="HTTPS port for the virtual host to listen on.")
     parser.add_argument('--ssl-certificate-file',
@@ -167,12 +173,6 @@ if __name__ == '__main__':
                         help="Location to the SSL Certificate Key file.")
     parser.add_argument('--ssl-certificate-ca-file',
                         help="Location to the SSL Certificate CA file.")
-    parser.add_argument('-r', '--reload-service', action='store_true',
-                        help="Reload the service after installation.",
-                        default=False)
-    parser.add_argument('-z', '--no-install', action='store_true',
-                        help="Only display virtual host data, do not install.",
-                        default=False)
     parser.add_argument('--enable-ssl', action='store_true',
                         help="Enable SSL virtual host.", default=False)
 
