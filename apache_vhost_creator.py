@@ -95,6 +95,9 @@ class VirtualHost():
         self.reload_server = self.get_reload_server()
         self.no_install = self.get_no_install()
         self.enable_ssl = self.get_enable_ssl()
+        self.ssl_certificate_file = None
+        self.ssl_certificate_key_file = None
+        self.ssl_certificate_ca_file = None
         if self.enable_ssl:
             self.ssl_certificate_file = self.get_ssl_certificate_file()
             self.ssl_certificate_key_file = self.get_ssl_certificate_key_file()
@@ -202,4 +205,3 @@ if __name__ == '__main__':
                      '--ssl-certificate-key-file.')
 
     virtualhost = VirtualHost(args, Server())
-    virtualhost.print_about()
