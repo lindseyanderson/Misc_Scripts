@@ -92,9 +92,11 @@ class VirtualHost():
         self.bind_address = self.get_bind_address()
         self.log_directory = self.get_log_directory()
         self.http_port = self.get_http_port()
+        self.https_port = self.get_https_port()
         self.reload_server = self.get_reload_server()
         self.no_install = self.get_no_install()
         self.enable_ssl = self.get_enable_ssl()
+        self.get_mod_auth_options()
         self.ssl_certificate_file = None
         self.ssl_certificate_key_file = None
         self.ssl_certificate_ca_file = None
@@ -137,19 +139,30 @@ class VirtualHost():
         self.bind_address = self._args.get('bind_address')
         return self.bind_address
 
+    def get_mod_auth_options(self):
+
+        self.mod_auth_options = "Require if valid" if \
+                    float(self.server.apache_release_version) >= 2.4 else \
+                    """Order Allow,Deny
+                Allow from all"""
+        return self.mod_auth_options
+
     def get_log_directory(self):
         self.log_directory = self._args.get('log_directory') if \
                              self._args.get('log_directory') is not None else \
                              '/var/log/httpd/' \
                              if self.server.os_family == 'redhat' else \
                              '/var/log/apache2/'
-        
+        self._args['log_directory'] = self.log_directory
         return self.log_directory
 
     def get_http_port(self):
         self.http_port = self._args.get('http_port')
         return self.http_port
 
+    def get_https_port(self):
+        self.https_port = self._args.get('https_port')
+        return self.https_port
 
     def get_reload_server(self):
         self.reload_server = self._args.get('reload_service')
@@ -162,6 +175,78 @@ class VirtualHost():
     def get_enable_ssl(self):
         self.enable_ssl = self._args.get('enable_ssl')
         return self.enable_ssl
+
+    def get_http_template(self):
+        template_options = {
+            'server_name': self.server_name,
+            'alt_names': self.server_aliases,
+            'document_root': self.document_root,
+            'mod_auth_options': self.mod_auth_options,
+            'log_directory': self.log_directory,
+            'http_port': self.http_port,
+            'https_port': self.https_port,
+            'bind_address': self.bind_address
+        }
+        template = """<VirtualHost {bind_address}:{http_port}>
+        ServerName {server_name} 
+        ServerAlias {alt_names}
+
+        DocumentRoot {document_root}
+
+        <Directory {document_root}>
+                Options -Indexes +FollowSymLinks -MultiViews
+                AllowOverride All
+                {mod_auth_options}
+        </Directory>
+
+        #CustomLog {log_directory}/ssl-{server_name}-access.log forwarded
+        CustomLog {log_directory}/{server_name}-access.log combined
+        ErrorLog {log_directory}/ssl-{server_name}-error.log
+
+        # Possible values include: debug, info, notice, warn, error, crit,
+        # alert, emerg.
+        LogLevel warn
+</VirtualHost>
+        """
+        if self.enable_ssl:
+            template += """
+<VirtualHost: {bind_address}:{https_port}>
+        ServerName {server_name}
+        ServerAlias {alt_names}
+
+        DocumentRoot {document_root}
+
+        <Directory {document_root}
+                Options -Indexes +FollowSymLinks -Multiviews
+                AllowOverride All
+                {mod_auth_options}
+        </Directory>
+
+        #CustomLog {log_directory}/ssl-{server_name}-access.log forwarded
+        CustomLog {log_directory}/{server_name}-access.log combined
+        ErrorLog {log_directory}/ssl-{server_name}-error.log
+
+        # Possible values include: debug, info, notice, warn, error, crit,
+        # alert, emerg.
+        LogLevel warn
+
+        SSLEngine on
+        SSLCertificateFile    {ssl_certificate_file}
+        SSLCertificateKeyFile {ssl_certificate_key_file}
+        {ssl_certificate_ca_file}
+        <FilesMatch \\"\.(cgi|shtml|phtml|php)$\\">
+                SSLOptions +StdEnvVars
+        </FilesMatch>
+        BrowserMatch \\"MSIE [2-6]\\" \\
+                nokeepalive ssl-unclean-shutdown \\
+                downgrade-1.0 force-response-1.0
+        BrowserMatch \\"MSIE [17-9]\\" ssl-unclean-shutdown
+<VirtualHost>
+            """
+        template = template.format(**template_options)
+        return template
+
+
 
 if __name__ == '__main__':
 
@@ -203,5 +288,10 @@ if __name__ == '__main__':
        and args.get('ssl_certificate_key_file') is None:
         parser.error('--enable-ssl requires --ssl-certificate-file and '
                      '--ssl-certificate-key-file.')
+    args['alt_names'] = ' '.join(map(str, args.get('alt_names'))) if \
+                        args.get('alt_names') else 'www.{0}'.format(
+                        args.get('server_name'))
 
-    virtualhost = VirtualHost(args, Server())
+    server = Server()
+    virtualhost = VirtualHost(args, server)
+    print virtualhost.get_http_template()
