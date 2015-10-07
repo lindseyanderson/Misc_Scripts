@@ -46,30 +46,48 @@ class Server:
              return True            
          except IOError as (err, e):
              print "I/O error {0}: {1}".format(err, e)
-         except:
+             raise
+         except Exception as e:
              print "Unable to create configuration file."
-             return False 
+             print e
+             raise
 
     def create_vhost_document_root(self, document_root=None):
-        if not os.path.exists(document_root):
-            os.makedirs(document_root)
+         """ Create a directory at the specified location."""
+         try:
+             if not os.path.exists(document_root):
+                 os.makedirs(document_root)
+         except IOError as (err, e):
+             print "I/O error {0}: {1}".format(err, e)
+             raise
+         except:
+             print "Unable to create directory: {0}".format(document_root)
+             print e
+             raise
         
     def get_vhost_config_dir(self):
+        """ Determine the virtual host configuration director based off the
+        server family.  Using conventional directories based on previous Apache
+        releases."""
         vhost_config_dir = "{0}/vhost.d".format(self.apache_config_dir) if \
                            self.os_family == "redhat" else \
                            "{0}/sites-available".format(self.apache_config_dir)
         return vhost_config_dir
 
     def get_apache_release_version(self):
+        """ Determine current Apache release version installed on server."""
         p = subprocess.Popen(self.apache_binary + " -v", shell=True,
                              stdout=subprocess.PIPE)
         for line in p.stdout.readlines():
             if "Server version".lower() in line.lower():
                 if "2.2" in line: release = "2.2"
                 if "2.4" in line: release = "2.4"
+        release = release if release else "2.4"
         return release
 
     def get_apache_config_dir(self):
+        """ Setup default Apache working configuration directory based
+        on output from the binary."""
         apache_base = '/etc/httpd'
         p = subprocess.Popen(self.apache_binary +" -V", shell=True,
                              stdout=subprocess.PIPE)
@@ -81,15 +99,18 @@ class Server:
         return apache_base
 
     def get_family(self):
+        """ Determine OS family based off distribution."""
         self._os_family = 'debian' if self.distribution.lower() == 'debian' \
                           or self.distribution.lower() == 'ubuntu' else \
                           'redhat'
         return self._os_family
    
     def get_distro(self):
+        """ Get current distribution string."""
         return self._distribution
 
     def get_distro_release(self):
+        """ Get current distribution release version string."""
         return self._version
    
     def print_about(self):
@@ -129,6 +150,7 @@ class VirtualHost():
  
 
     def print_about(self):
+        """ Output detailed information to the user about options specified."""
         print "Server Name: {0}".format(virtualhost.server_name)
         print "Server Aliases: {0}".format(virtualhost.server_aliases)
         print "Document Root: {0}".format(virtualhost.document_root)
@@ -140,6 +162,9 @@ class VirtualHost():
         print "SSL Enabled? {0}".format(virtualhost.enable_ssl)
 
     def get_server_aliases(self):
+        """ Determine user aliases based on arguments passed in by the
+        user.  As multiple aliases can be provided, split the input for 
+        injection in our template."""
         server_aliases = self._args.get('server_aliases')
         self.server_aliases = ' '.join(map(str, server_aliases)) \
                               if server_aliases else \
@@ -147,18 +172,18 @@ class VirtualHost():
         return self.server_aliases
 
     def get_document_root(self):
+        """ Using arguments passed by the user, attempt to determine the 
+        document root to hold site data.  If no data is passed by the user,
+        use a common location."""
         document_root = self._args.get('document_root')
         self.document_root = '/var/www/vhosts/{0}/httpdocs'.format( 
                              self.server_name) if not document_root else \
                              document_root
         return self.document_root
 
-    def get_bind_address(self):
-        self.bind_address = self._args.get('bind_address')
-        return self.bind_address
-
     def get_mod_auth_options(self):
-
+        """ Determine mod_auth_options based on the release of the 
+        Apache instance running on the Cloud Server."""
         self.mod_auth_options = "Require if valid" if \
                     float(self.server.apache_release_version) >= 2.4 else \
                     """Order Allow,Deny
@@ -166,6 +191,9 @@ class VirtualHost():
         return self.mod_auth_options
 
     def get_log_directory(self):
+        """ Using arguments passed by the user, attempt to determine the log
+        directory.  If no argument is passed, setup sane defaults based on
+        the OS family."""
         self.log_directory = self._args.get('log_directory') if \
                              self._args.get('log_directory') is not None else \
                              '/var/log/httpd/' \
@@ -175,6 +203,9 @@ class VirtualHost():
         return self.log_directory
 
     def get_http_template(self):
+        """ Generate a virtual host template based off data fed in from user
+        arguments."""
+
         template_options = {
             'server_name': self.server_name,
             'alt_names': self.server_aliases,
