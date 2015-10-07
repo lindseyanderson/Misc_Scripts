@@ -30,8 +30,21 @@ class Server:
             print "Could not enable virtual host {0}.".format(virtual_host)
             raise
         return True
-        
 
+    def create_vhost_conf_file(self, server_name=None, template=None):
+         if not server_name and not template:
+             return False
+         file_location = '{0}/{1}.conf'.format(self.apache_vhost_config_dir,
+                                               server_name)        
+         f = open(file_location, 'w')
+         f.write(template)
+         f.close()
+         return True            
+
+    def create_vhost_document_root(self, document_root=None):
+        if not os.path.exists(document_root):
+            os.makedirs(document_root)
+        
     def get_vhost_config_dir(self):
         vhost_config_dir = "{0}/vhost.d".format(self.apache_config_dir) if \
                            self.os_family == "redhat" else \
@@ -294,4 +307,9 @@ if __name__ == '__main__':
 
     server = Server()
     virtualhost = VirtualHost(args, server)
-    print virtualhost.get_http_template()
+    template = virtualhost.get_http_template()
+    if server.create_vhost_conf_file(virtualhost.server_name,
+                                     template):
+        server.create_vhost_document_root(virtualhost.document_root)
+        server.enable_virtualhost(virtualhost.server_name)
+  
