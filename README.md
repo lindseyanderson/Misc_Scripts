@@ -1,22 +1,24 @@
 # Misc_Scripts
 ======
-usage: virtualhost_installer.py [-h] -s SERVER_NAME
-                                [-n [ALT_NAMES [ALT_NAMES ...]]]
-                                [-d DOCUMENT_ROOT] [-b BIND_ADDRESS]
-                                [-l LOG_DIRECTORY] [-p HTTP_PORT] [-r] [-z]
-                                [--https-port HTTPS_PORT]
-                                [--ssl-certificate-file SSL_CERTIFICATE_FILE]
-                                [--ssl-certificate-key-file SSL_CERTIFICATE_KEY_FILE]
-                                [--ssl-certificate-ca-file SSL_CERTIFICATE_CA_FILE]
-                                [--enable-ssl]
+### Usage
+```
+usage: apache_vhost_creator.py [-h] -s SERVER_NAME
+                               [-a [SERVER_ALIASES [SERVER_ALIASES ...]]]
+                               [-d DOCUMENT_ROOT] [-b BIND_ADDRESS]
+                               [-l LOG_DIRECTORY] [-p HTTP_PORT] [-r] [-z]
+                               [--https-port HTTPS_PORT]
+                               [--ssl-certificate-file SSL_CERTIFICATE_FILE]
+                               [--ssl-certificate-key-file SSL_CERTIFICATE_KEY_FILE]
+                               [--ssl-certificate-ca-file SSL_CERTIFICATE_CA_FILE]
+                               [--enable-ssl] [--verbose]
 
-Installer of virtual hosts for various services
+Virtual Host installation for Apache running on Linux.
 
 optional arguments:
   -h, --help            show this help message and exit
   -s SERVER_NAME, --server-name SERVER_NAME
                         ServerName to be used in configuration.
-  -n [ALT_NAMES [ALT_NAMES ...]], --alt-names [ALT_NAMES [ALT_NAMES ...]]
+  -a [SERVER_ALIASES [SERVER_ALIASES ...]], --server-aliases [SERVER_ALIASES [SERVER_ALIASES ...]]
                         List of alternate names
   -d DOCUMENT_ROOT, --document-root DOCUMENT_ROOT
                         Location for all files to be stored.
@@ -37,3 +39,5 @@ optional arguments:
   --ssl-certificate-ca-file SSL_CERTIFICATE_CA_FILE
                         Location to the SSL Certificate CA file.
   --enable-ssl          Enable SSL virtual host.
+  --verbose             Enable Verbose output.
+```

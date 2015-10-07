@@ -7,10 +7,9 @@ import re
 import subprocess
 import sys
 
+
 class Server:
-    """
-    """
-    
+    """ Class to interface for an Apache instance. """
     def __init__(self):
         self.distribution = platform.linux_distribution()[0]
         self.version = platform.linux_distribution()[1]
@@ -20,51 +19,51 @@ class Server:
         self.apache_config_dir = self.get_apache_config_dir()
         self.apache_release_version = self.get_apache_release_version()
         self.apache_vhost_config_dir = self.get_vhost_config_dir()
-      
+
     def enable_virtualhost(self, virtual_host):
         """Return True the Apache service was properly reload"""
-        try: 
+        try:
             if self._os_family == "debian":
-                p = subprocess.Popen("a2ensite " + virtual_host, shell=True)
-            po = subprocess.Popen(self.apache_binary + " -k graceful", shell=True)
+                subprocess.Popen("a2ensite " + virtual_host, shell=True)
+            subprocess.Popen(self.apache_binary + " -k graceful", shell=True)
         except:
             print "Could not enable virtual host {0}.".format(virtual_host)
             raise
         return True
 
     def create_vhost_conf_file(self, server_name=None, template=None):
-         """ Create a file at the location identified in get_vhost_config_dir
-         with the template data specified."""
-         try:
-             if not server_name and not template:
-                 return False
-             file_location = '{0}/{1}.conf'.format(self.apache_vhost_config_dir,
-                                                   server_name)        
-             f = open(file_location, 'w')
-             f.write(template)
-             f.close()
-             return True            
-         except IOError as (err, e):
-             print "I/O error {0}: {1}".format(err, e)
-             raise
-         except Exception as e:
-             print "Unable to create configuration file."
-             print e
-             raise
+        """ Create a file at the location identified in get_vhost_config_dir
+        with the template data specified."""
+        try:
+            if not server_name and not template:
+                return False
+            file_location = '{0}/{1}.conf'.format(self.apache_vhost_config_dir,
+                                                  server_name)
+            f = open(file_location, 'w')
+            f.write(template)
+            f.close()
+            return True
+        except IOError as (err, e):
+            print "I/O error {0}: {1}".format(err, e)
+            raise
+        except Exception as e:
+            print "Unable to create configuration file."
+            print e
+            raise
 
     def create_vhost_document_root(self, document_root=None):
-         """ Create a directory at the specified location."""
-         try:
-             if not os.path.exists(document_root):
-                 os.makedirs(document_root)
-         except IOError as (err, e):
-             print "I/O error {0}: {1}".format(err, e)
-             raise
-         except:
-             print "Unable to create directory: {0}".format(document_root)
-             print e
-             raise
-        
+        """ Create a directory at the specified location."""
+        try:
+            if not os.path.exists(document_root):
+                os.makedirs(document_root)
+        except IOError as (err, e):
+            print "I/O error {0}: {1}".format(err, e)
+            raise
+        except:
+            print "Unable to create directory: {0}".format(document_root)
+            print e
+            raise
+
     def get_vhost_config_dir(self):
         """ Determine the virtual host configuration director based off the
         server family.  Using conventional directories based on previous Apache
@@ -80,8 +79,10 @@ class Server:
                              stdout=subprocess.PIPE)
         for line in p.stdout.readlines():
             if "Server version".lower() in line.lower():
-                if "2.2" in line: release = "2.2"
-                if "2.4" in line: release = "2.4"
+                if "2.2" in line:
+                    release = "2.2"
+                if "2.4" in line:
+                    release = "2.4"
         release = release if release else "2.4"
         return release
 
@@ -89,13 +90,14 @@ class Server:
         """ Setup default Apache working configuration directory based
         on output from the binary."""
         apache_base = '/etc/httpd'
-        p = subprocess.Popen(self.apache_binary +" -V", shell=True,
+        p = subprocess.Popen(self.apache_binary + " -V", shell=True,
                              stdout=subprocess.PIPE)
         for line in p.stdout.readlines():
             if "HTTPD_ROOT" in line:
                 apache_base = line.split('=')[1].replace('"', '')
                 apache_base = re.sub('[^a-zA-Z0-9-_/.]', '', apache_base)
-        if not apache_base: sys.exit(1)
+        if not apache_base:
+            sys.exit(1)
         return apache_base
 
     def get_family(self):
@@ -104,7 +106,7 @@ class Server:
                           or self.distribution.lower() == 'ubuntu' else \
                           'redhat'
         return self._os_family
-   
+
     def get_distro(self):
         """ Get current distribution string."""
         return self._distribution
@@ -112,7 +114,7 @@ class Server:
     def get_distro_release(self):
         """ Get current distribution release version string."""
         return self._version
-   
+
     def print_about(self):
         print "OS Family: {0}".format(self.os_family)
         print "OS Distribution: {0}".format(self.distribution)
@@ -121,16 +123,15 @@ class Server:
         print "Apache Configuration Base: {0}".format(self.apache_config_dir)
         print "Apache Vhost Configuration Directory: {0}".format(
               self.apache_vhost_config_dir)
-   
+
 
 class VirtualHost():
-    """
-    """
+    """ Class to generate data using user supplied arguments."""
     def __init__(self, args, server):
         self._args = args
         self.server = server
-        self.server_name = self._args.get('server_name') 
-        self.server_aliases = self.get_server_aliases() 
+        self.server_name = self._args.get('server_name')
+        self.server_aliases = self.get_server_aliases()
         self.document_root = self.get_document_root()
         self.bind_address = self._args.get('bind_address')
         self.log_directory = self.get_log_directory()
@@ -147,7 +148,6 @@ class VirtualHost():
             self.ssl_certificate_file = self.get_ssl_certificate_file()
             self.ssl_certificate_key_file = self.get_ssl_certificate_key_file()
             self.ssl_certificate_ca_file = self.get_ssl_certificate_ca_file()
- 
 
     def print_about(self):
         """ Output detailed information to the user about options specified."""
@@ -163,7 +163,7 @@ class VirtualHost():
 
     def get_server_aliases(self):
         """ Determine user aliases based on arguments passed in by the
-        user.  As multiple aliases can be provided, split the input for 
+        user.  As multiple aliases can be provided, split the input for
         injection in our template."""
         server_aliases = self._args.get('server_aliases')
         self.server_aliases = ' '.join(map(str, server_aliases)) \
@@ -172,21 +172,21 @@ class VirtualHost():
         return self.server_aliases
 
     def get_document_root(self):
-        """ Using arguments passed by the user, attempt to determine the 
+        """ Using arguments passed by the user, attempt to determine the
         document root to hold site data.  If no data is passed by the user,
         use a common location."""
         document_root = self._args.get('document_root')
-        self.document_root = '/var/www/vhosts/{0}/httpdocs'.format( 
+        self.document_root = '/var/www/vhosts/{0}/httpdocs'.format(
                              self.server_name) if not document_root else \
-                             document_root
+            document_root
         return self.document_root
 
     def get_mod_auth_options(self):
-        """ Determine mod_auth_options based on the release of the 
+        """ Determine mod_auth_options based on the release of the
         Apache instance running on the Cloud Server."""
         self.mod_auth_options = "Require if valid" if \
-                    float(self.server.apache_release_version) >= 2.4 else \
-                    """Order Allow,Deny
+                                float(self.server.apache_release_version) \
+                                >= 2.4 else """Order Allow,Deny
                 Allow from all"""
         return self.mod_auth_options
 
@@ -195,10 +195,10 @@ class VirtualHost():
         directory.  If no argument is passed, setup sane defaults based on
         the OS family."""
         self.log_directory = self._args.get('log_directory') if \
-                             self._args.get('log_directory') is not None else \
-                             '/var/log/httpd/' \
-                             if self.server.os_family == 'redhat' else \
-                             '/var/log/apache2/'
+            self._args.get('log_directory') is not None else \
+            '/var/log/httpd/' \
+            if self.server.os_family == 'redhat' else \
+            '/var/log/apache2/'
         self._args['log_directory'] = self.log_directory
         return self.log_directory
 
@@ -217,7 +217,7 @@ class VirtualHost():
             'bind_address': self.bind_address
         }
         template = """<VirtualHost {bind_address}:{http_port}>
-        ServerName {server_name} 
+        ServerName {server_name}
         ServerAlias {alt_names}
 
         # Files for the site will be located in {document_root}
@@ -225,8 +225,8 @@ class VirtualHost():
 
         # Example redirect forcing all requests to www.{server_name}
         # RewriteEngine on
-        # RewriteCond %{HTTP_HOST} ^${server_name}
-        # RewriteRule %^(.*)$ http://www.${server_name} [R=301,L]
+        # RewriteCond %{{HTTP_HOST}} ^{server_name}
+        # RewriteRule ^(.*)$ http://www.{server_name} [R=301,L]
 
         <Directory {document_root}>
                 Options -Indexes +FollowSymLinks -MultiViews
@@ -234,7 +234,7 @@ class VirtualHost():
                 {mod_auth_options}
         </Directory>
 
-        # CustomLog can be modified based off the LogFormat specified in the 
+        # CustomLog can be modified based off the LogFormat specified in the
         # main Apache configuration file.  To use the forwarded format use the
         # following.
         # CustomLog {log_directory}/ssl-{server_name}-access.log forwarded
@@ -290,7 +290,6 @@ class VirtualHost():
         return template
 
 
-
 if __name__ == '__main__':
 
     description = "Virtual Host installation for Apache running on Linux."
@@ -300,13 +299,13 @@ if __name__ == '__main__':
                         required=True)
     parser.add_argument('-a', '--server-aliases', nargs='*',
                         help="List of alternate names")
-    parser.add_argument('-d', '--document-root', 
+    parser.add_argument('-d', '--document-root',
                         help="Location for all files to be stored.")
     parser.add_argument('-b', '--bind-address', default='*',
                         help="IP the virtual host will listen on.")
     parser.add_argument('-l', '--log-directory',
                         help="Log directory location on the server.")
-    parser.add_argument('-p', '--http-port', 
+    parser.add_argument('-p', '--http-port',
                         help="HTTP port for the virtual host to listen on.",
                         default=80)
     parser.add_argument('-r', '--reload-service', action='store_true',
@@ -325,6 +324,8 @@ if __name__ == '__main__':
                         help="Location to the SSL Certificate CA file.")
     parser.add_argument('--enable-ssl', action='store_true',
                         help="Enable SSL virtual host.", default=False)
+    parser.add_argument('--verbose', action='store_true',
+                        help="Enable Verbose output.", default=False)
 
     args = vars(parser.parse_args())
     if args.get('enable_ssl') and args.get('ssl_certificate_file') is None \
@@ -338,6 +339,9 @@ if __name__ == '__main__':
     server = Server()
     virtualhost = VirtualHost(args, server)
     template = virtualhost.get_http_template()
+    if args['verbose']:
+        server.print_about()
+        virtualhost.print_about()
     if args['no_install']:
         print template
         sys.exit(0)
@@ -346,4 +350,3 @@ if __name__ == '__main__':
         server.create_vhost_document_root(virtualhost.document_root)
     if args['reload_service']:
         server.enable_virtualhost(virtualhost.server_name)
-  
