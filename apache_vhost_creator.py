@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+__author__ = "Lindsey Anderson"
+__version__ = "1.0.0"
 
 import argparse
 import os
