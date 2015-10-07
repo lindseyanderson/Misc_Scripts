@@ -1,6 +1,6 @@
 # Misc_Scripts
 ======
-### Usage
+### Vhost Installation - Usage
 ```
 usage: apache_vhost_creator.py [-h] -s SERVER_NAME
                                [-a [SERVER_ALIASES [SERVER_ALIASES ...]]]
