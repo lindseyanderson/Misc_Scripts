@@ -22,6 +22,7 @@ class Server:
         self.apache_vhost_config_dir = self.get_vhost_config_dir()
       
     def enable_virtualhost(self, virtual_host):
+        """Return True the Apache service was properly reload"""
         try: 
             if self._os_family == "debian":
                 p = subprocess.Popen("a2ensite " + virtual_host, shell=True)
@@ -32,14 +33,22 @@ class Server:
         return True
 
     def create_vhost_conf_file(self, server_name=None, template=None):
-         if not server_name and not template:
-             return False
-         file_location = '{0}/{1}.conf'.format(self.apache_vhost_config_dir,
-                                               server_name)        
-         f = open(file_location, 'w')
-         f.write(template)
-         f.close()
-         return True            
+         """ Create a file at the location identified in get_vhost_config_dir
+         with the template data specified."""
+         try:
+             if not server_name and not template:
+                 return False
+             file_location = '{0}/{1}.conf'.format(self.apache_vhost_config_dir,
+                                                   server_name)        
+             f = open(file_location, 'w')
+             f.write(template)
+             f.close()
+             return True            
+         except IOError as (err, e):
+             print "I/O error {0}: {1}".format(err, e)
+         except:
+             print "Unable to create configuration file."
+             return False 
 
     def create_vhost_document_root(self, document_root=None):
         if not os.path.exists(document_root):
@@ -99,16 +108,16 @@ class VirtualHost():
     def __init__(self, args, server):
         self._args = args
         self.server = server
-        self.server_name = self.get_server_name()
+        self.server_name = self._args.get('server_name') 
         self.server_aliases = self.get_server_aliases() 
         self.document_root = self.get_document_root()
-        self.bind_address = self.get_bind_address()
+        self.bind_address = self._args.get('bind_address')
         self.log_directory = self.get_log_directory()
-        self.http_port = self.get_http_port()
-        self.https_port = self.get_https_port()
-        self.reload_server = self.get_reload_server()
-        self.no_install = self.get_no_install()
-        self.enable_ssl = self.get_enable_ssl()
+        self.http_port = self._args.get('http_port')
+        self.https_port = self._args.get('https_port')
+        self.reload_server = self._args.get('reload_service')
+        self.no_install = self._args.get('no_install')
+        self.enable_ssl = self._args.get('enable_ssl')
         self.get_mod_auth_options()
         self.ssl_certificate_file = None
         self.ssl_certificate_key_file = None
@@ -129,10 +138,6 @@ class VirtualHost():
         print "Reload Apache? {0}".format(virtualhost.reload_server)
         print "Install virtual host? {0}".format(virtualhost.no_install)
         print "SSL Enabled? {0}".format(virtualhost.enable_ssl)
-
-    def get_server_name(self):
-        self.server_name = self._args.get('server_name')
-        return self.server_name
 
     def get_server_aliases(self):
         server_aliases = self._args.get('server_aliases')
@@ -169,26 +174,6 @@ class VirtualHost():
         self._args['log_directory'] = self.log_directory
         return self.log_directory
 
-    def get_http_port(self):
-        self.http_port = self._args.get('http_port')
-        return self.http_port
-
-    def get_https_port(self):
-        self.https_port = self._args.get('https_port')
-        return self.https_port
-
-    def get_reload_server(self):
-        self.reload_server = self._args.get('reload_service')
-        return self.reload_server
-   
-    def get_no_install(self):
-        self.no_install = self._args.get('no_install')
-        return self.no_install
-
-    def get_enable_ssl(self):
-        self.enable_ssl = self._args.get('enable_ssl')
-        return self.enable_ssl
-
     def get_http_template(self):
         template_options = {
             'server_name': self.server_name,
@@ -204,7 +189,13 @@ class VirtualHost():
         ServerName {server_name} 
         ServerAlias {alt_names}
 
+        # Files for the site will be located in {document_root}
         DocumentRoot {document_root}
+
+        # Example redirect forcing all requests to www.{server_name}
+        # RewriteEngine on
+        # RewriteCond %{HTTP_HOST} ^${server_name}
+        # RewriteRule %^(.*)$ http://www.${server_name} [R=301,L]
 
         <Directory {document_root}>
                 Options -Indexes +FollowSymLinks -MultiViews
@@ -212,7 +203,11 @@ class VirtualHost():
                 {mod_auth_options}
         </Directory>
 
-        #CustomLog {log_directory}/ssl-{server_name}-access.log forwarded
+        # CustomLog can be modified based off the LogFormat specified in the 
+        # main Apache configuration file.  To use the forwarded format use the
+        # following.
+        # CustomLog {log_directory}/ssl-{server_name}-access.log forwarded
+
         CustomLog {log_directory}/{server_name}-access.log combined
         ErrorLog {log_directory}/ssl-{server_name}-error.log
 
@@ -235,7 +230,11 @@ class VirtualHost():
                 {mod_auth_options}
         </Directory>
 
+        # CustomLog can be modified based off the LogFormat specified in the
+        # main Apache configuration file.  To use the forwarded format use the
+        # following.
         #CustomLog {log_directory}/ssl-{server_name}-access.log forwarded
+
         CustomLog {log_directory}/{server_name}-access.log combined
         ErrorLog {log_directory}/ssl-{server_name}-error.log
 
@@ -308,8 +307,12 @@ if __name__ == '__main__':
     server = Server()
     virtualhost = VirtualHost(args, server)
     template = virtualhost.get_http_template()
+    if args['no_install']:
+        print template
+        sys.exit(0)
     if server.create_vhost_conf_file(virtualhost.server_name,
                                      template):
         server.create_vhost_document_root(virtualhost.document_root)
+    if args['reload_service']:
         server.enable_virtualhost(virtualhost.server_name)
   
